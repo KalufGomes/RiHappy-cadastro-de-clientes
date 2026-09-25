@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kaluf e Gomes — Sistema de Pós-Venda</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap');
+
+  :root{
+    --navy: #041D33; --forest: #2E5147; --gold: #C6982E;
+    --bg: #3B6280; --card: #D8E9F2; --card-chart: #D8E9F2;
+    --text: #232722; --text-soft: #6B7269; --line: #BFDAE8; --radius: 10px;
+    --text-on-bg: #EAF3F8; --text-soft-on-bg: #C3D8E4;
+  }
+  *{box-sizing:border-box;}
+  body{ margin:0; font-family:'Inter',sans-serif; background:var(--bg); color:var(--text-on-bg); display:flex; min-height:100vh; }
+
+  /* Login */
+  #loginOverlay{
+    position:fixed; inset:0; background:var(--navy); display:flex; align-items:center; justify-content:center; z-index:100;
+  }
+  #loginOverlay .box{ background:#fff; border-radius:14px; padding:36px 34px; width:380px; }
+  #loginOverlay h2{ font-family:'Fraunces',serif; margin:0 0 4px; font-size:22px; }
+  #loginOverlay p{ margin:0 0 20px; color:var(--text-soft); font-size:13px; }
+  #loginOverlay label{ font-size:12.5px; font-weight:600; color:var(--text-soft); display:flex; flex-direction:column; gap:5px; margin-bottom:14px; }
+  #loginOverlay input{ font-family:'Inter',sans-serif; font-size:14px; padding:10px 12px; border:1px solid var(--line); border-radius:7px; }
+  #loginOverlay button{ width:100%; margin-top:6px; }
+  #loginError{ background:#FBEAE4; color:#A14322; font-size:13px; padding:8px 10px; border-radius:7px; margin-bottom:14px; display:none; }
+
+  /* Sidebar */
+  .sidebar{ width:230px; background:var(--navy); color:#EDEFEA; display:flex; flex-direction:column; flex-shrink:0; }
+  .sidebar-brand{ padding:0; border-bottom:1px solid rgba(255,255,255,0.08); display:flex; align-items:center; }
+  .sidebar-brand img{ width:100%; height:auto; display:block; }
+  .sidebar-brand .kg{ font-family:'Fraunces',serif; font-weight:600; font-size:18px; line-height:1.1; padding:22px 20px; }
+  .sidebar-brand .sub{ font-size:10.5px; color:#B7C4CC; margin-top:2px; text-transform:uppercase; letter-spacing:0.5px; }
+  .nav{ padding:14px 10px; display:flex; flex-direction:column; gap:2px; }
+  .nav button{ all:unset; cursor:pointer; color:#CBD3D6; padding:10px 14px; border-radius:8px; font-size:14px; font-weight:500; }
+  .nav button.active{ background:rgba(198,152,46,0.16); color:#F4E4B8; }
+  .nav button:hover:not(.active){ background:rgba(255,255,255,0.06); }
+  .nav-user{ margin-top:auto; padding:12px 18px; font-size:11.5px; color:#8B98A0; border-top:1px solid rgba(255,255,255,0.08); }
+  .nav-user b{ color:#E4E7DE; display:block; font-size:13px; margin-bottom:2px; }
+  .nav-user button{ all:unset; cursor:pointer; color:#C9846B; font-size:11.5px; margin-top:6px; text-decoration:underline; }
+
+  .partner-slot{ padding:6px 18px 20px; border-top:1px solid rgba(255,255,255,0.08); margin-top:6px; }
+  .partner-slot .label{ font-size:10px; text-transform:uppercase; letter-spacing:0.6px; color:#8B98A0; margin-bottom:8px; }
+  .partner-logo-box{
+    background:rgba(255,255,255,0.94); border-radius:10px; width:100%; aspect-ratio:1/1; max-width:160px;
+    display:flex; align-items:center; justify-content:center; color:#8A8578; font-size:11.5px; font-weight:600;
+    border:1.5px dashed #C9CBB8; overflow:hidden; text-align:center; padding:8px;
+  }
+  .partner-logo-box.has-logo{ padding:0; border:none; background:none; }
+  .partner-logo-box img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+  /* Main */
+  .main{ flex:1; padding:32px 38px 46px; max-width:1240px; }
+  .view{ display:none; }
+  .view.active{ display:block; }
+  .topbar{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:22px; flex-wrap:wrap; gap:14px; }
+  .topbar h1{ font-family:'Fraunces',serif; font-size:30px; font-weight:700; margin:0 0 6px; color:var(--text-on-bg); text-transform:uppercase; letter-spacing:0.6px; }
+  .topbar p{ margin:0; color:var(--text-soft-on-bg); font-size:14px; }
+  .actions{ display:flex; gap:10px; }
+  .btn{ border:none; border-radius:8px; padding:10px 16px; font-size:13.5px; font-weight:600; cursor:pointer; font-family:'Inter',sans-serif; }
+  .btn-primary{ background:var(--navy); color:#fff; }
+  .btn-ghost{ background:#fff; color:var(--navy); border:1px solid var(--line); }
+  .btn-sm{ padding:7px 12px; font-size:12.5px; }
+
+  .search-row{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px 18px; display:flex; align-items:center; gap:10px; margin-bottom:24px; color:var(--text); box-shadow:0 4px 14px rgba(4,29,51,0.18); }
+  .search-row input{ border:none; outline:none; font-family:'Inter',sans-serif; font-size:14px; flex:1; background:transparent; }
+
+  .grid{ display:grid; grid-template-columns: 1.3fr 1fr; gap:22px; margin-bottom:22px; }
+  .card{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px 24px; color:var(--text); box-shadow:0 4px 14px rgba(4,29,51,0.18); }
+  .card.chartcard{ background:var(--card-chart); border-color:#A9CADC; }
+  .card h3{ font-family:'Fraunces',serif; font-size:16px; font-weight:700; margin:0 0 16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:8px; text-transform:uppercase; letter-spacing:0.5px; }
+  .card h3 span.tag{ font-family:'Inter',sans-serif; font-size:11px; font-weight:600; color:var(--forest); background:rgba(255,255,255,0.7); padding:3px 8px; border-radius:20px; }
+
+  .filter-row{ display:flex; gap:8px; margin-bottom:14px; align-items:center; flex-wrap:wrap; }
+  .filter-row select, .filter-row input[type=date]{ font-family:'Inter',sans-serif; font-size:13px; padding:7px 10px; border:1px solid #BFDAE8; border-radius:7px; color:var(--text); background:#fff; }
+
+  .birthday-list{ list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px;}
+  .birthday-list li{ display:flex; justify-content:space-between; align-items:center; font-size:13.5px; padding-bottom:10px; border-bottom:1px solid var(--line); }
+  .birthday-list li:last-child{ border:none; padding-bottom:0; }
+  .birthday-list .name{ font-weight:600; }
+  .birthday-list .date{ color:var(--text-soft); font-size:12.5px; }
+  .empty-msg{ color:var(--text-soft); font-size:13px; }
+  .badge-gold{ background:#FBF1DC; color:#8A6B14; font-size:11px; font-weight:700; padding:3px 8px; border-radius:20px; flex-shrink:0; }
+
+  .kpi-row{ display:grid; grid-template-columns:repeat(3,1fr); gap:18px; margin-bottom:22px; }
+  .kpi{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:20px 22px; color:var(--text); box-shadow:0 4px 14px rgba(4,29,51,0.18); }
+  .kpi .num{ font-family:'Fraunces',serif; font-size:28px; font-weight:700; color:var(--navy); }
+  .kpi .lbl{ font-size:12px; color:var(--text-soft); margin-top:2px; }
+
+  .clients-table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+  .clients-table th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.4px; color:var(--text-soft); padding:8px 10px; border-bottom:1px solid var(--line); }
+  .clients-table td{ padding:10px 10px; border-bottom:1px solid var(--line); vertical-align:middle; }
+  .clients-table tr:last-child td{ border:none; }
+  .clients-table tr.clickable{ cursor:pointer; }
+  .clients-table tr.clickable:hover{ background:#F7F8F5; }
+  .wa-link{ display:inline-flex; align-items:center; gap:5px; color:#2E5147; text-decoration:none; font-weight:600; }
+  .wa-link svg{ flex-shrink:0; }
+
+  form.panel{ background:var(--card); border:1px solid var(--line); border-radius:14px; padding:26px; max-width:460px; display:flex; flex-direction:column; gap:16px; color:var(--text); box-shadow:0 4px 14px rgba(4,29,51,0.18); }
+  form.panel label{ font-size:12.5px; font-weight:600; color:var(--text-soft); display:flex; flex-direction:column; gap:5px; }
+  form.panel input, form.panel select{ font-family:'Inter',sans-serif; font-size:14px; padding:9px 11px; border:1px solid var(--line); border-radius:7px; font-weight:400; color:var(--text); background:#fff; }
+  .msg{ font-size:13px; padding:9px 12px; border-radius:7px; display:none; }
+  .msg.ok{ background:#E7EEE9; color:#2E5147; display:block; }
+  .msg.err{ background:#FBEAE4; color:#A14322; display:block; }
+  .inline-add{ display:flex; gap:8px; }
+  .inline-add input{ flex:1; }
+
+  .loading-msg{ text-align:center; padding:40px; color:var(--text-on-bg); font-size:14px; }
+
+  footer.note{ margin-top:18px; font-size:11.5px; color:var(--text-soft-on-bg); text-align:center; }
+</style>
+</head>
+<body>
+
+  <div id="loadingOverlay" class="loading-msg" style="position:fixed; inset:0; background:var(--navy); display:flex; align-items:center; justify-content:center; z-index:200;">
+    Carregando o sistema...
+  </div>
+
+  <div id="loginOverlay" style="display:none;">
+    <div class="box">
+      <img src="kaluf-logo.png" alt="Kaluf e Gomes" style="width:100%; margin-bottom:20px;" onerror="this.style.display='none'">
+      <p>Sistema de pós-venda — acesso restrito</p>
+      <div class="msg err" id="loginError"></div>
+      <form id="formLogin">
+        <label>Usuário
+          <input type="text" id="loginUsername" required autocomplete="username">
+        </label>
+        <label>Senha
+          <input type="password" id="loginPassword" required autocomplete="current-password">
+        </label>
+        <button type="submit" class="btn btn-primary">Entrar</button>
+      </form>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-brand">
+      <img src="kaluf-logo.png" alt="Kaluf e Gomes" onerror="this.outerHTML='&lt;div class=&quot;kg&quot;&gt;Kaluf e Gomes&lt;div class=&quot;sub&quot;&gt;Soluções Empresariais&lt;/div&gt;&lt;/div&gt;'">
+    </div>
+    <nav class="nav">
+      <button class="active" data-view="painel">◆ Painel</button>
+      <button data-view="clientes">◆ Clientes</button>
+      <button data-view="novo-cliente">◆ Novo cliente</button>
+      <button data-view="nova-venda">◆ Registrar venda</button>
+      <button data-view="produtos">◆ Produtos</button>
+      <button data-view="usuarios" id="navUsuarios" style="display:none;">◆ Usuários</button>
+    </nav>
+    <div class="nav-user">
+      <b id="navUserName">—</b>
+      <span id="navUserRole"></span>
+      <button onclick="logout()">Sair</button>
+    </div>
+    <div class="partner-slot">
+      <div class="label">Loja parceira</div>
+      <div class="partner-logo-box has-logo">
+        <img src="loja-logo.png" alt="Logo da loja parceira" onerror="this.parentElement.classList.remove('has-logo'); this.parentElement.textContent='sem logo configurado';">
+      </div>
+    </div>
+  </aside>
+
+  <main class="main">
+
+    <!-- PAINEL -->
+    <section id="view-painel" class="view active">
+      <div class="topbar">
+        <div>
+          <h1>Painel de pós-venda</h1>
+          <p>Visão geral da loja — atualizado automaticamente</p>
+        </div>
+        <div class="actions">
+          <button class="btn btn-ghost" onclick="showView('novo-cliente')">Novo cliente</button>
+          <button class="btn btn-primary" onclick="showView('nova-venda')">Registrar venda</button>
+        </div>
+      </div>
+
+      <div class="search-row">
+        <span>🔍</span>
+        <input type="text" id="searchInput" placeholder="Buscar cliente por nome ou telefone...">
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi"><div class="num" id="kpiClients">–</div><div class="lbl">Clientes cadastrados</div></div>
+        <div class="kpi" id="kpiTotalBox"><div class="num" id="kpiTotal">–</div><div class="lbl">Vendido no período</div></div>
+        <div class="kpi" id="kpiTicketBox"><div class="num" id="kpiTicket">–</div><div class="lbl">Ticket médio no período</div></div>
+      </div>
+
+      <div class="grid">
+        <div class="card chartcard">
+          <h3>Produtos mais vendidos <span class="tag" id="periodTag">hoje</span></h3>
+          <div class="filter-row">
+            <select id="periodSelect">
+              <option value="today">Hoje</option>
+              <option value="7d">Últimos 7 dias</option>
+              <option value="month">Este mês</option>
+              <option value="year">Este ano</option>
+              <option value="all">Todo o período</option>
+              <option value="custom">Personalizado (calendário)</option>
+            </select>
+            <span id="customDateRow" style="display:none; gap:8px; align-items:center;">
+              <input type="date" id="customStart"> até <input type="date" id="customEnd">
+              <button class="btn btn-ghost btn-sm" onclick="applyCustomPeriod()">Aplicar</button>
+            </span>
+          </div>
+          <canvas id="chartProdutos" height="170"></canvas>
+        </div>
+        <div class="card">
+          <h3>Aniversariantes <span class="tag" id="birthdayTag">hoje</span></h3>
+          <div class="filter-row">
+            <input type="date" id="birthdayDate">
+            <button class="btn btn-ghost btn-sm" onclick="setBirthdayDate(new Date().toISOString().slice(0,10))">Hoje</button>
+          </div>
+          <ul class="birthday-list" id="birthdayList"><li class="empty-msg">Carregando...</li></ul>
+        </div>
+      </div>
+
+      <div class="card chartcard" id="sellerCard" style="display:none; margin-bottom:18px;">
+        <h3>Vendas por vendedor <span class="tag" id="sellerPeriodTag">hoje</span></h3>
+        <div class="filter-row">
+          <select id="sellerFilter"><option value="">Todos os vendedores</option></select>
+        </div>
+        <canvas id="chartVendedores" height="160"></canvas>
+      </div>
+
+      <div class="card">
+        <h3>Clientes recentes</h3>
+        <table class="clients-table">
+          <thead><tr><th>Nome</th><th>Telefone</th><th>Última compra</th></tr></thead>
+          <tbody id="clientsTableBody"><tr><td colspan="3" class="empty-msg">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+
+      <footer class="note">Dados armazenados na planilha Google da Kaluf e Gomes</footer>
+    </section>
+
+    <!-- NOVO CLIENTE -->
+    <section id="view-novo-cliente" class="view">
+      <div class="topbar"><div><h1>Novo cliente</h1><p>Cadastro feito uma única vez por cliente</p></div></div>
+      <form class="panel" id="formCliente">
+        <div class="msg" id="msgCliente"></div>
+        <label>Primeiro nome<input type="text" id="clienteNome" required></label>
+        <label>Telefone (identificador único)<input type="text" id="clienteTelefone" placeholder="(16) 99999-0000" required></label>
+        <label>Aniversário
+          <div style="display:flex; gap:8px;">
+            <select id="clienteDia"><option value="">Dia</option></select>
+            <select id="clienteMes" style="flex:1.4;">
+              <option value="">Mês</option>
+              <option value="01">Janeiro</option><option value="02">Fevereiro</option>
+              <option value="03">Março</option><option value="04">Abril</option>
+              <option value="05">Maio</option><option value="06">Junho</option>
+              <option value="07">Julho</option><option value="08">Agosto</option>
+              <option value="09">Setembro</option><option value="10">Outubro</option>
+              <option value="11">Novembro</option><option value="12">Dezembro</option>
+            </select>
+          </div>
+        </label>
+        <button type="submit" class="btn btn-primary">Salvar cliente</button>
+      </form>
+    </section>
+
+    <!-- LISTA DE CLIENTES -->
+    <section id="view-clientes" class="view">
+      <div class="topbar"><div><h1>Clientes cadastrados</h1><p>Clique em um cliente para ver e editar os dados</p></div></div>
+      <div class="search-row">
+        <span>🔍</span>
+        <input type="text" id="searchInputClientes" placeholder="Buscar por nome ou telefone...">
+      </div>
+      <div class="filter-row" style="margin-bottom:14px;">
+        <select id="clientPeriodSelect">
+          <option value="all">Todo o período</option>
+          <option value="today">Cadastrados hoje</option>
+          <option value="7d">Últimos 7 dias</option>
+          <option value="month">Este mês</option>
+          <option value="year">Este ano</option>
+          <option value="custom">Personalizado (calendário)</option>
+        </select>
+        <span id="clientCustomDateRow" style="display:none; gap:8px; align-items:center;">
+          <input type="date" id="clientCustomStart"> até <input type="date" id="clientCustomEnd">
+          <button class="btn btn-ghost btn-sm" onclick="applyClientCustomPeriod()">Aplicar</button>
+        </span>
+      </div>
+      <div class="card">
+        <table class="clients-table">
+          <thead><tr><th>Nome</th><th>Telefone</th><th>Aniversário</th><th>Cadastrado em</th><th>WhatsApp</th></tr></thead>
+          <tbody id="allClientsTableBody"><tr><td colspan="5" class="empty-msg">Carregando...</td></tr></tbody>
+        </table>
+      </div>
+
+      <div class="card" id="clientDetailCard" style="display:none; margin-top:18px;">
+        <h3 id="clientDetailName">—</h3>
+        <form class="panel" id="formEditCliente" style="max-width:100%; padding:0; border:none; box-shadow:none; margin-bottom:18px;">
+          <div class="msg" id="msgEditCliente"></div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <label style="flex:1; min-width:160px;">Primeiro nome<input type="text" id="editNome" required></label>
+            <label style="flex:1; min-width:160px;">Telefone<input type="text" id="editTelefone" required></label>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <select id="editDia"><option value="">Dia</option></select>
+            <select id="editMes" style="flex:1.4;">
+              <option value="">Mês</option>
+              <option value="01">Janeiro</option><option value="02">Fevereiro</option>
+              <option value="03">Março</option><option value="04">Abril</option>
+              <option value="05">Maio</option><option value="06">Junho</option>
+              <option value="07">Julho</option><option value="08">Agosto</option>
+              <option value="09">Setembro</option><option value="10">Outubro</option>
+              <option value="11">Novembro</option><option value="12">Dezembro</option>
+            </select>
+          </div>
+          <button type="submit" class="btn btn-primary btn-sm" style="align-self:flex-start;">Salvar alterações</button>
+        </form>
+        <table class="clients-table">
+          <thead><tr><th>Produto</th><th>Valor</th><th>Data</th></tr></thead>
+          <tbody id="clientSalesBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- NOVA VENDA -->
+    <section id="view-nova-venda" class="view">
+      <div class="topbar"><div><h1>Registrar venda</h1><p>Busque o cliente pelo telefone já cadastrado</p></div></div>
+      <form class="panel" id="formVenda">
+        <div class="msg" id="msgVenda"></div>
+        <label>Telefone do cliente<input type="text" id="vendaTelefone" placeholder="(16) 99999-0000" required></label>
+        <label>Produto<input type="text" id="vendaProduto" placeholder="Ex: Vestido midi" required></label>
+        <label>Valor (R$)<input type="text" inputmode="decimal" placeholder="Ex: 120,50" id="vendaValor" required></label>
+        <label>Data da venda<input type="date" id="vendaData"></label>
+        <label>Vendedor
+          <select id="vendaVendedor"><option value="">Selecione...</option></select>
+        </label>
+        <div class="inline-add">
+          <input type="text" id="novoVendedorNome" placeholder="Nome de um vendedor novo">
+          <button type="button" class="btn btn-ghost btn-sm" onclick="addSeller()">+ Adicionar</button>
+        </div>
+        <button type="submit" class="btn btn-primary">Registrar venda</button>
+      </form>
+    </section>
+
+    <!-- PRODUTOS: quem comprou -->
+    <section id="view-produtos" class="view">
+      <div class="topbar">
+        <div>
+          <h1>Quem comprou esse produto?</h1>
+          <p>Selecione um produto para ver os clientes e oferecer promoções complementares</p>
+        </div>
+      </div>
+      <div class="search-row">
+        <select id="productSelect" style="border:none; outline:none; font-family:'Inter',sans-serif; font-size:14px; flex:1; background:transparent;">
+          <option value="">Selecione um produto...</option>
+        </select>
+      </div>
+      <div class="card">
+        <table class="clients-table">
+          <thead><tr><th>Cliente</th><th>Telefone</th><th>Vezes que comprou</th><th>Última compra</th><th>WhatsApp</th></tr></thead>
+          <tbody id="productBuyersBody"><tr><td colspan="5" class="empty-msg">Selecione um produto acima</td></tr></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- USUÁRIOS -->
+    <section id="view-usuarios" class="view">
+      <div class="topbar"><div><h1>Usuários do sistema</h1><p>Somente a senha gerencial pode criar novos acessos</p></div></div>
+      <form class="panel" id="formUsuario" style="margin-bottom:20px;">
+        <div class="msg" id="msgUsuario"></div>
+        <label>Nome de exibição<input type="text" id="userDisplayName" required></label>
+        <label>Usuário (login)<input type="text" id="userUsername" required></label>
+        <label>Senha<input type="password" id="userPassword" required></label>
+        <label>Papel
+          <select id="userRole">
+            <option value="atendente">Atendimento (sem acesso a valores/relatórios)</option>
+            <option value="gerente">Gerencial (acesso completo)</option>
+          </select>
+        </label>
+        <button type="submit" class="btn btn-primary">Criar usuário</button>
+      </form>
+      <div class="card">
+        <table class="clients-table">
+          <thead><tr><th>Nome</th><th>Usuário</th><th>Papel</th></tr></thead>
+          <tbody id="usersTableBody"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+<script>
+  // ATENÇÃO: troque pela URL do seu Aplicativo da Web, gerada no passo
+  // "Implantar" do Apps Script (veja INSTRUCOES.txt)
+  const API_URL = "https://script.google.com/macros/s/AKfycbw_hpB0-PxjxvW6iYTt2tq1_bOWIcKOs_3sl2Y8BXLe1ZpQgcIGp7ueaJDhLavgpG5I4g/exec";
+
+  let token = localStorage.getItem("kg_token") || null;
+  let currentUser = null;
+  let chart, sellerChart;
+  let periodMode = { period: "today" };
+  let lastRegisteredPhone = "";
+
+  const WA_ICON = '<svg width="15" height="15" viewBox="0 0 24 24" fill="#2E5147"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.29-1.39a9.9 9.9 0 0 0 4.75 1.21h.01c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 18.15h-.01a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.14.82.84-3.06-.2-.31a8.22 8.22 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.26-8.24 2.2 0 4.27.86 5.83 2.42a8.18 8.18 0 0 1 2.41 5.83c0 4.55-3.7 8.25-8.24 8.25zm4.52-6.17c-.25-.12-1.47-.72-1.69-.8-.23-.08-.39-.12-.56.13-.17.24-.64.8-.78.96-.14.17-.29.19-.53.06-.25-.12-1.05-.39-1.99-1.23-.74-.65-1.23-1.46-1.38-1.7-.14-.25-.02-.38.11-.5.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43-.14-.01-.31-.01-.48-.01-.17 0-.43.06-.66.31-.23.25-.86.84-.86 2.04 0 1.2.88 2.37 1 2.53.12.17 1.73 2.64 4.19 3.7.59.25 1.04.4 1.4.52.59.19 1.12.16 1.54.1.47-.07 1.47-.6 1.68-1.18.21-.58.21-1.08.14-1.18-.06-.1-.23-.16-.48-.28z"/></svg>';
+
+  function waLink(phone){
+    const digits = (phone || "").replace(/\D/g, "");
+    if(!digits) return "";
+    const withCountry = digits.startsWith("55") ? digits : "55" + digits;
+    return `https://wa.me/${withCountry}`;
+  }
+
+  // ---------- Comunicação com o Apps Script ----------
+  // Envia sempre como texto simples (não JSON no cabeçalho) para evitar
+  // que o navegador bloqueie a chamada com uma verificação de CORS que
+  // o Apps Script não responde bem.
+  async function chamarAPI(action, dados){
+    const corpo = Object.assign({ action: action, token: token }, dados || {});
+    try{
+      const res = await fetch(API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(corpo),
+      });
+      const data = await res.json();
+      if(data.error === "Não autenticado." || data._status === 401){
+        logout();
+      }
+      return data;
+    } catch(err){
+      return { error: "Erro de conexão. Verifique sua internet e tente novamente." };
+    }
+  }
+
+  // ---------- Login ----------
+  document.getElementById("formLogin").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const errBox = document.getElementById("loginError");
+    const data = await chamarAPI("login", {
+      username: document.getElementById("loginUsername").value,
+      password: document.getElementById("loginPassword").value,
+    });
+    if(data.ok){
+      token = data.token;
+      localStorage.setItem("kg_token", token);
+      currentUser = { display_name: data.display_name, role: data.role };
+      errBox.style.display = "none";
+      document.getElementById("loginOverlay").style.display = "none";
+      initApp();
+    } else {
+      errBox.textContent = data.error || "Erro ao entrar.";
+      errBox.style.display = "block";
+    }
+  });
+
+  function logout(){
+    localStorage.removeItem("kg_token");
+    token = null;
+    location.reload();
+  }
+
+  function applyRoleUI(){
+    document.getElementById("navUserName").textContent = currentUser.display_name;
+    document.getElementById("navUserRole").textContent = currentUser.role === "gerente" ? "Acesso gerencial" : "Atendimento";
+    const isManager = currentUser.role === "gerente";
+    document.getElementById("navUsuarios").style.display = isManager ? "block" : "none";
+    document.getElementById("sellerCard").style.display = isManager ? "block" : "none";
+    document.getElementById("kpiTotalBox").style.display = isManager ? "block" : "none";
+    document.getElementById("kpiTicketBox").style.display = isManager ? "block" : "none";
+  }
+
+  // ---------- Navegação ----------
+  function showView(name){
+    document.querySelectorAll(".view").forEach(v => v.classList.remove("active"));
+    document.getElementById("view-" + name).classList.add("active");
+    document.querySelectorAll(".nav button").forEach(b => b.classList.toggle("active", b.dataset.view === name));
+    if(name === "painel") loadDashboard();
+    if(name === "clientes") loadAllClients();
+    if(name === "produtos") loadProductSelect();
+    if(name === "usuarios") loadUsers();
+    if(name === "nova-venda"){
+      loadSellersIntoSelect();
+      if(lastRegisteredPhone) document.getElementById("vendaTelefone").value = lastRegisteredPhone;
+    }
+  }
+  document.querySelectorAll(".nav button").forEach(b => b.addEventListener("click", () => showView(b.dataset.view)));
+
+  // ---------- Período (presets + calendário personalizado) ----------
+  document.getElementById("periodSelect").addEventListener("change", (e) => {
+    const val = e.target.value;
+    document.getElementById("customDateRow").style.display = val === "custom" ? "inline-flex" : "none";
+    if(val !== "custom"){ periodMode = { period: val }; loadDashboard(); }
+  });
+  function applyCustomPeriod(){
+    const start = document.getElementById("customStart").value;
+    const end = document.getElementById("customEnd").value;
+    if(!start || !end){ alert("Escolha as duas datas."); return; }
+    periodMode = { start, end };
+    loadDashboard();
+  }
+  function periodParams(){
+    if(periodMode.start && periodMode.end) return { start: periodMode.start, end: periodMode.end };
+    return { period: periodMode.period || "today" };
+  }
+
+  // ---------- Dashboard ----------
+  async function loadDashboard(){
+    const data = await chamarAPI("dashboard", periodParams());
+    if(data.error) return;
+
+    document.getElementById("periodTag").textContent = data.period_label.toLowerCase();
+    document.getElementById("sellerPeriodTag").textContent = data.period_label.toLowerCase();
+    document.getElementById("kpiClients").textContent = data.total_clients;
+
+    if(currentUser.role === "gerente"){
+      document.getElementById("kpiTotal").textContent = "R$ " + (data.period_total_sold || 0).toFixed(2).replace(".", ",");
+      document.getElementById("kpiTicket").textContent = "R$ " + (data.period_avg_ticket || 0).toFixed(2).replace(".", ",");
+      loadSellerChart();
+    }
+
+    const bDate = document.getElementById("birthdayDate").value || new Date().toISOString().slice(0,10);
+    loadBirthdays(bDate);
+
+    const tbody = document.getElementById("clientsTableBody");
+    tbody.innerHTML = "";
+    if(data.recent_clients.length === 0){
+      tbody.innerHTML = '<tr><td colspan="3" class="empty-msg">Nenhum cliente cadastrado ainda</td></tr>';
+    } else {
+      data.recent_clients.forEach(c => {
+        tbody.innerHTML += `<tr><td>${c.first_name}</td><td>${c.phone}</td><td>${c.last_sale ? c.last_sale : "—"}</td></tr>`;
+      });
+    }
+
+    const labels = data.top_products.map(p => p.product_name);
+    const values = data.top_products.map(p => p.qty);
+    if(chart) chart.destroy();
+    chart = new Chart(document.getElementById("chartProdutos"), {
+      type: "bar",
+      data: { labels, datasets: [{ data: values, backgroundColor: "#041D33", borderRadius: 5, maxBarThickness: 34 }] },
+      options: { responsive:true, plugins:{legend:{display:false}},
+        scales:{ x:{grid:{display:false},ticks:{color:"#3B4A44",font:{size:11}}}, y:{grid:{color:"#C5DBE6"},ticks:{color:"#3B4A44",font:{size:11},precision:0}} } }
+    });
+  }
+
+  // ---------- Aniversariantes ----------
+  function setBirthdayDate(dateStr){
+    document.getElementById("birthdayDate").value = dateStr;
+    loadBirthdays(dateStr);
+  }
+  async function loadBirthdays(dateStr){
+    const data = await chamarAPI("birthdays", { date: dateStr });
+    if(data.error) return;
+    const today = new Date().toISOString().slice(0,10);
+    document.getElementById("birthdayTag").textContent = dateStr === today ? "hoje" : dateStr.split("-").reverse().join("/");
+
+    const bList = document.getElementById("birthdayList");
+    bList.innerHTML = "";
+    if(data.birthdays.length === 0){
+      bList.innerHTML = '<li class="empty-msg">Nenhum aniversariante nessa data</li>';
+      return;
+    }
+    data.birthdays.forEach(b => {
+      bList.innerHTML += `<li><div><div class="name">${b.first_name}</div><div class="date">${b.phone}</div></div>
+        <a class="wa-link" href="${waLink(b.phone)}" target="_blank">${WA_ICON}</a></li>`;
+    });
+  }
+  document.getElementById("birthdayDate").addEventListener("change", (e) => loadBirthdays(e.target.value));
+
+  // ---------- Vendedores: gráfico ----------
+  async function loadSellerChart(){
+    if(document.getElementById("sellerFilter").options.length <= 1) await loadSellersIntoFilter();
+    const sellerId = document.getElementById("sellerFilter").value;
+    const params = Object.assign(periodParams(), sellerId ? { seller_id: sellerId } : {});
+    const data = await chamarAPI("dashboardSellers", params);
+    if(data.error) return;
+    const labels = data.sellers.map(s => s.seller_name);
+    const values = data.sellers.map(s => s.total);
+    if(sellerChart) sellerChart.destroy();
+    sellerChart = new Chart(document.getElementById("chartVendedores"), {
+      type: "bar",
+      data: { labels, datasets: [{ data: values, backgroundColor: "#041D33", borderRadius: 5, maxBarThickness: 34 }] },
+      options: { responsive:true, plugins:{legend:{display:false}},
+        scales:{ x:{grid:{display:false},ticks:{color:"#3B4A44",font:{size:11}}},
+                 y:{grid:{color:"#C5DBE6"},ticks:{color:"#3B4A44",font:{size:11},callback:(v)=>"R$ "+v}} } }
+    });
+  }
+  async function loadSellersIntoFilter(){
+    const sellers = await chamarAPI("listSellers", {});
+    if(sellers.error) return;
+    const sel = document.getElementById("sellerFilter");
+    sel.innerHTML = '<option value="">Todos os vendedores</option>' + sellers.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+  }
+  document.getElementById("sellerFilter").addEventListener("change", loadSellerChart);
+
+  // ---------- Busca no painel ----------
+  document.getElementById("searchInput").addEventListener("input", async (e) => {
+    const clients = await chamarAPI("listClients", { search: e.target.value.trim() });
+    const tbody = document.getElementById("clientsTableBody");
+    tbody.innerHTML = "";
+    if(!clients.length){
+      tbody.innerHTML = '<tr><td colspan="3" class="empty-msg">Nenhum cliente encontrado</td></tr>';
+    } else {
+      clients.forEach(c => { tbody.innerHTML += `<tr><td>${c.first_name}</td><td>${c.phone}</td><td>—</td></tr>`; });
+    }
+  });
+
+  // ---------- Tela Clientes ----------
+  const diaOptionsHTML = Array.from({length:31}, (_,i) => { const d=String(i+1).padStart(2,"0"); return `<option value="${d}">${i+1}</option>`; }).join("");
+  document.getElementById("clienteDia").innerHTML += diaOptionsHTML;
+  document.getElementById("editDia").innerHTML += diaOptionsHTML;
+
+  let clientPeriodState = { period: "all" };
+  async function loadAllClients(query){
+    const params = Object.assign({ search: query || "" }, clientPeriodState);
+    const clients = await chamarAPI("listClients", params);
+    const tbody = document.getElementById("allClientsTableBody");
+    tbody.innerHTML = "";
+    if(clients.error || !clients.length){
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">Nenhum cliente encontrado</td></tr>';
+      return;
+    }
+    clients.forEach(c => {
+      const bday = c.birthday ? c.birthday.split("-")[0] + "/" + c.birthday.split("-")[1] : "—";
+      const cadastro = c.created_at ? c.created_at.split("-").reverse().join("/") : "—";
+      const tr = document.createElement("tr");
+      tr.className = "clickable";
+      tr.innerHTML = `<td>${c.first_name}</td><td>${c.phone}</td><td>${bday}</td><td>${cadastro}</td>
+        <td><a class="wa-link" href="${waLink(c.phone)}" target="_blank" onclick="event.stopPropagation()">${WA_ICON} abrir</a></td>`;
+      tr.addEventListener("click", () => loadClientDetail(c.id));
+      tbody.appendChild(tr);
+    });
+  }
+  document.getElementById("searchInputClientes").addEventListener("input", (e) => loadAllClients(e.target.value.trim()));
+  document.getElementById("clientPeriodSelect").addEventListener("change", (e) => {
+    const val = e.target.value;
+    document.getElementById("clientCustomDateRow").style.display = val === "custom" ? "inline-flex" : "none";
+    if(val !== "custom"){
+      clientPeriodState = { period: val };
+      loadAllClients(document.getElementById("searchInputClientes").value.trim());
+    }
+  });
+  function applyClientCustomPeriod(){
+    const start = document.getElementById("clientCustomStart").value;
+    const end = document.getElementById("clientCustomEnd").value;
+    if(!start || !end) return;
+    clientPeriodState = { start: start, end: end };
+    loadAllClients(document.getElementById("searchInputClientes").value.trim());
+  }
+
+  let editingClientId = null;
+  async function loadClientDetail(id){
+    const c = await chamarAPI("clientDetail", { id: id });
+    if(c.error) return;
+    editingClientId = id;
+    document.getElementById("clientDetailCard").style.display = "block";
+    document.getElementById("clientDetailName").textContent = c.first_name;
+    document.getElementById("editNome").value = c.first_name;
+    document.getElementById("editTelefone").value = c.phone;
+    const [d, m] = (c.birthday || "-").split("-");
+    document.getElementById("editDia").value = d || "";
+    document.getElementById("editMes").value = m || "";
+    document.getElementById("msgEditCliente").style.display = "none";
+
+    const body = document.getElementById("clientSalesBody");
+    body.innerHTML = "";
+    if(!c.sales.length){
+      body.innerHTML = '<tr><td colspan="3" class="empty-msg">Nenhuma compra registrada ainda</td></tr>';
+    } else {
+      c.sales.forEach(s => {
+        body.innerHTML += `<tr><td>${s.product_name}</td><td>R$ ${Number(s.amount).toFixed(2).replace(".", ",")}</td><td>${s.sale_date}</td></tr>`;
+      });
+    }
+    document.getElementById("clientDetailCard").scrollIntoView({behavior:"smooth"});
+  }
+
+  document.getElementById("formEditCliente").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("msgEditCliente");
+    const dia = document.getElementById("editDia").value;
+    const mes = document.getElementById("editMes").value;
+    const data = await chamarAPI("updateClient", {
+      id: editingClientId,
+      first_name: document.getElementById("editNome").value,
+      phone: document.getElementById("editTelefone").value,
+      birthday: (dia && mes) ? (dia + "-" + mes) : "",
+    });
+    if(data.ok){
+      msg.className = "msg ok"; msg.textContent = "Dados atualizados."; msg.style.display="block";
+      loadAllClients();
+    } else {
+      msg.className = "msg err"; msg.textContent = data.error || "Erro ao salvar."; msg.style.display="block";
+    }
+  });
+
+  // ---------- Novo cliente ----------
+  document.getElementById("formCliente").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("msgCliente");
+    const dia = document.getElementById("clienteDia").value;
+    const mes = document.getElementById("clienteMes").value;
+    const phone = document.getElementById("clienteTelefone").value;
+    const data = await chamarAPI("createClient", {
+      first_name: document.getElementById("clienteNome").value,
+      phone: phone,
+      birthday: (dia && mes) ? (dia + "-" + mes) : "",
+    });
+    if(data.ok){
+      msg.className = "msg ok"; msg.textContent = "Cliente salvo com sucesso."; msg.style.display="block";
+      lastRegisteredPhone = phone;
+      document.getElementById("formCliente").reset();
+    } else {
+      msg.className = "msg err"; msg.textContent = data.error || "Erro ao salvar."; msg.style.display="block";
+    }
+  });
+
+  // ---------- Nova venda ----------
+  async function loadSellersIntoSelect(){
+    const sellers = await chamarAPI("listSellers", {});
+    if(sellers.error) return;
+    const sel = document.getElementById("vendaVendedor");
+    sel.innerHTML = '<option value="">Selecione...</option>' + sellers.map(s => `<option value="${s.id}">${s.name}</option>`).join("");
+  }
+  async function addSeller(){
+    const nameInput = document.getElementById("novoVendedorNome");
+    const name = nameInput.value.trim();
+    if(!name) return;
+    const data = await chamarAPI("createSeller", { name });
+    if(data.ok){
+      nameInput.value = "";
+      await loadSellersIntoSelect();
+      document.getElementById("vendaVendedor").value = data.id;
+    }
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    const vendaData = document.getElementById("vendaData");
+    if(vendaData) vendaData.value = new Date().toISOString().slice(0, 10);
+    const birthdayDate = document.getElementById("birthdayDate");
+    if(birthdayDate) birthdayDate.value = new Date().toISOString().slice(0, 10);
+  });
+
+  document.getElementById("formVenda").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("msgVenda");
+    msg.style.display = "none";
+
+    const valorTexto = document.getElementById("vendaValor").value.trim();
+    const valorNumero = parseFloat(valorTexto.replace(/\./g, "").replace(",", "."));
+    const vendedorId = document.getElementById("vendaVendedor").value;
+
+    if(!vendedorId){
+      msg.className = "msg err"; msg.textContent = "Selecione o vendedor antes de registrar a venda."; msg.style.display = "block";
+      return;
+    }
+    if(isNaN(valorNumero) || valorNumero <= 0){
+      msg.className = "msg err"; msg.textContent = "Digite um valor válido, exemplo: 120,50"; msg.style.display = "block";
+      return;
+    }
+
+    const data = await chamarAPI("createSale", {
+      phone: document.getElementById("vendaTelefone").value,
+      product_name: document.getElementById("vendaProduto").value,
+      amount: valorNumero,
+      sale_date: document.getElementById("vendaData").value,
+      seller_id: vendedorId,
+    });
+    if(data.ok){
+      msg.className = "msg ok"; msg.textContent = "Venda registrada com sucesso."; msg.style.display="block";
+      document.getElementById("formVenda").reset();
+      document.getElementById("vendaData").value = new Date().toISOString().slice(0, 10);
+    } else {
+      msg.className = "msg err"; msg.textContent = data.error || "Erro ao registrar venda."; msg.style.display="block";
+    }
+  });
+
+  // ---------- Produtos: quem comprou ----------
+  async function loadProductSelect(){
+    const products = await chamarAPI("listProducts", {});
+    if(products.error) return;
+    const sel = document.getElementById("productSelect");
+    const current = sel.value;
+    sel.innerHTML = '<option value="">Selecione um produto...</option>' +
+      products.map(p => `<option value="${p.id}">${p.name} (${p.vezes_vendido}x vendido)</option>`).join("");
+    sel.value = current;
+  }
+  document.getElementById("productSelect").addEventListener("change", async (e) => {
+    const tbody = document.getElementById("productBuyersBody");
+    if(!e.target.value){
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">Selecione um produto acima</td></tr>';
+      return;
+    }
+    tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">Carregando...</td></tr>';
+    const data = await chamarAPI("productBuyers", { product_id: e.target.value });
+    if(data.error || !data.buyers.length){
+      tbody.innerHTML = '<tr><td colspan="5" class="empty-msg">Ninguém comprou esse produto ainda</td></tr>';
+      return;
+    }
+    tbody.innerHTML = "";
+    data.buyers.forEach(b => {
+      tbody.innerHTML += `<tr><td>${b.first_name}</td><td>${b.phone}</td><td>${b.qty}</td><td>${b.last_purchase}</td>
+        <td><a class="wa-link" href="${waLink(b.phone)}" target="_blank">${WA_ICON} abrir</a></td></tr>`;
+    });
+  });
+
+  // ---------- Usuários ----------
+  async function loadUsers(){
+    const users = await chamarAPI("listUsers", {});
+    if(users.error) return;
+    const tbody = document.getElementById("usersTableBody");
+    tbody.innerHTML = users.map(u => `<tr><td>${u.display_name}</td><td>${u.username}</td><td>${u.role === "gerente" ? "Gerencial" : "Atendimento"}</td></tr>`).join("");
+  }
+  document.getElementById("formUsuario").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const msg = document.getElementById("msgUsuario");
+    const data = await chamarAPI("createUser", {
+      display_name: document.getElementById("userDisplayName").value,
+      username: document.getElementById("userUsername").value,
+      password: document.getElementById("userPassword").value,
+      role: document.getElementById("userRole").value,
+    });
+    if(data.ok){
+      msg.className = "msg ok"; msg.textContent = "Usuário criado."; msg.style.display="block";
+      document.getElementById("formUsuario").reset();
+      loadUsers();
+    } else {
+      msg.className = "msg err"; msg.textContent = data.error || "Erro ao criar usuário."; msg.style.display="block";
+    }
+  });
+
+  // ---------- Início ----------
+  async function initApp(){
+    applyRoleUI();
+    await loadSellersIntoFilter();
+    loadDashboard();
+  }
+
+  async function iniciar(){
+    if(token){
+      const data = await chamarAPI("me", {});
+      if(data.ok){
+        currentUser = { display_name: data.display_name, role: data.role };
+        document.getElementById("loadingOverlay").style.display = "none";
+        initApp();
+        return;
+      }
+      // token inválido/expirado: limpa e pede login de novo
+      localStorage.removeItem("kg_token");
+      token = null;
+    }
+    document.getElementById("loadingOverlay").style.display = "none";
+    document.getElementById("loginOverlay").style.display = "flex";
+  }
+  iniciar();
+</script>
+</body>
+</html>
